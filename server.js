@@ -25,6 +25,17 @@ function saveMessages(messages) {
 }
 
 let messages = loadMessages();
+const onlineUsers = new Map(); // ws -> nick
+
+function broadcastOnline() {
+  const users = Array.from(onlineUsers.values());
+  const data = JSON.stringify({ type: 'online', users });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -35,13 +46,18 @@ wss.on('connection', (ws) => {
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
 
+    if (msg.type === 'join') {
+      onlineUsers.set(ws, msg.nick);
+      broadcastOnline();
+    }
+
     if (msg.type === 'chat' && msg.nick && msg.text) {
       const message = {
+        id: Date.now() + Math.random().toString(36).slice(2),
         nick: msg.nick.slice(0, 30),
         text: msg.text.slice(0, 500),
         time: new Date().toISOString()
       };
-
       messages.push(message);
       if (messages.length > MAX_MESSAGES) messages = messages.slice(-MAX_MESSAGES);
       saveMessages(messages);
@@ -52,10 +68,25 @@ wss.on('connection', (ws) => {
         }
       });
     }
+
+    if (msg.type === 'delete' && msg.id) {
+      messages = messages.filter(m => m.id !== msg.id);
+      saveMessages(messages);
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'delete', id: msg.id }));
+        }
+      });
+    }
+  });
+
+  ws.on('close', () => {
+    onlineUsers.delete(ws);
+    broadcastOnline();
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`Laviva chat running on port ${PORT}`);
 });
