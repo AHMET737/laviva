@@ -29,7 +29,7 @@
     #online-count { font-size: 0.8rem; color: #a78bfa; font-weight: 600; display: flex; align-items: center; gap: 4px; }
     #status-dot {
       width: 10px; height: 10px; border-radius: 50%;
-      background: #22c55e; display: inline-block;
+      background: #eab308; display: inline-block;
       transition: background 0.3s;
     }
     #status-dot.yellow { background: #eab308; animation: blink 0.6s infinite; }
@@ -88,6 +88,19 @@
       padding: 4px 12px; background: #1a1a24; border-radius: 12px;
       align-self: center;
     }
+    .audio-bubble {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 16px;
+      background: #1e1e2e;
+    }
+    .msg.mine .audio-bubble { background: #6d28d9; }
+    .play-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      background: #a78bfa; color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; flex-shrink: 0;
+    }
+    .audio-label { font-size: 0.85rem; color: #e0e0e0; }
 
     #input-area {
       padding: 10px 12px; background: #17171f;
@@ -95,12 +108,15 @@
       flex-shrink: 0;
     }
     #msg-input { flex: 1; padding: 11px 16px; border-radius: 24px; }
-    #send-btn {
+    #send-btn, #mic-btn {
       width: 44px; height: 44px; border-radius: 50%; border: none;
-      background: #7c3aed; color: #fff; font-size: 1.1rem;
-      cursor: pointer; display: flex; align-items: center;
-      justify-content: center; flex-shrink: 0; -webkit-appearance: none;
+      color: #fff; font-size: 1.1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; -webkit-appearance: none;
     }
+    #send-btn { background: #7c3aed; }
+    #mic-btn { background: #1e1e2e; border: 1px solid #3a3a50; font-size: 1.2rem; }
+    #mic-btn.recording { background: #ef4444; border-color: #ef4444; animation: blink 0.6s infinite; }
   </style>
 </head>
 <body>
@@ -124,6 +140,7 @@
 <div id="chat-screen">
   <div id="messages"></div>
   <div id="input-area">
+    <button id="mic-btn">🎤</button>
     <input id="msg-input" type="text" placeholder="Mesaj yaz..." maxlength="500" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
     <button id="send-btn">➤</button>
   </div>
@@ -133,6 +150,9 @@
   const NICK_KEY = 'laviva_nick';
   let nick = localStorage.getItem(NICK_KEY) || '';
   let ws;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isRecording = false;
 
   const nickScreen = document.getElementById('nick-screen');
   const chatScreen = document.getElementById('chat-screen');
@@ -141,13 +161,12 @@
   const messagesEl = document.getElementById('messages');
   const msgInput = document.getElementById('msg-input');
   const sendBtn = document.getElementById('send-btn');
+  const micBtn = document.getElementById('mic-btn');
   const onlineNum = document.getElementById('online-num');
   const onlineList = document.getElementById('online-list');
   const statusDot = document.getElementById('status-dot');
 
-  function setStatus(s) {
-    statusDot.className = s;
-  }
+  function setStatus(s) { statusDot.className = s; }
 
   function formatTime(iso) {
     const d = new Date(iso);
@@ -171,33 +190,92 @@
     div.className = 'msg ' + (isMine ? 'mine' : 'other');
     div.dataset.id = msg.id;
 
+    let bubbleHtml = '';
+
     if (msg.deleted) {
-      div.innerHTML = `
-        <span class="msg-nick">${escapeHtml(msg.nick)}</span>
-        <div class="msg-bubble deleted-text">Bu mesaj silindi</div>
-        <span class="msg-time">${formatTime(msg.time)}</span>
+      bubbleHtml = `<div class="msg-bubble deleted-text">Bu mesaj silindi</div>`;
+    } else if (msg.audioUrl) {
+      bubbleHtml = `
+        <div class="audio-bubble">
+          <button class="play-btn" onclick="playAudio('${msg.audioUrl}', this)">▶</button>
+          <span class="audio-label">Sesli mesaj</span>
+        </div>
       `;
     } else {
-      div.innerHTML = `
-        <span class="msg-nick">${escapeHtml(msg.nick)}</span>
-        <div class="msg-bubble">${escapeHtml(msg.text)}</div>
-        <span class="msg-time">${formatTime(msg.time)}</span>
-        ${isMine ? `<button class="delete-btn">✕</button>` : ''}
-      `;
-      if (isMine) {
-        div.addEventListener('click', function(e) {
-          if (e.target.classList.contains('delete-btn')) {
-            ws.send(JSON.stringify({ type: 'delete', id: msg.id, nick }));
-            return;
-          }
-          document.querySelectorAll('.msg.mine').forEach(m => m.classList.remove('show-delete'));
-          div.classList.toggle('show-delete');
-        });
-      }
+      bubbleHtml = `<div class="msg-bubble">${escapeHtml(msg.text)}</div>`;
+    }
+
+    div.innerHTML = `
+      <span class="msg-nick">${escapeHtml(msg.nick)}</span>
+      ${bubbleHtml}
+      <span class="msg-time">${formatTime(msg.time)}</span>
+      ${isMine && !msg.deleted ? `<button class="delete-btn">✕</button>` : ''}
+    `;
+
+    if (isMine && !msg.deleted) {
+      div.addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-btn')) {
+          ws.send(JSON.stringify({ type: 'delete', id: msg.id, nick }));
+          return;
+        }
+        document.querySelectorAll('.msg.mine').forEach(m => m.classList.remove('show-delete'));
+        div.classList.toggle('show-delete');
+      });
     }
 
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function playAudio(url, btn) {
+    const audio = new Audio(url);
+    btn.textContent = '⏸';
+    audio.play();
+    audio.onended = () => btn.textContent = '▶';
+  }
+
+  async function toggleRecording() {
+    if (isRecording) {
+      mediaRecorder.stop();
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micBtn.textContent = '🎤';
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          stream.getTracks().forEach(t => t.stop());
+          await sendAudio(blob);
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        micBtn.classList.add('recording');
+        micBtn.textContent = '⏹';
+      } catch (e) {
+        alert('Mikrofon izni gerekli!');
+      }
+    }
+  }
+
+  async function sendAudio(blob) {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result;
+      try {
+        await fetch('/upload-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: base64, nick })
+        });
+      } catch (e) {
+        alert('Ses gönderilemedi!');
+      }
+    };
+    reader.readAsDataURL(blob);
   }
 
   function connect() {
@@ -265,15 +343,13 @@
     msgInput.value = '';
   }
 
+  micBtn.addEventListener('click', toggleRecording);
   nickBtn.addEventListener('click', enterChat);
   nickInput.addEventListener('keydown', e => { if (e.key === 'Enter') enterChat(); });
   sendBtn.addEventListener('click', sendMessage);
   msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
 
-  // Nick varsa direkt chat'e gir
-  if (nick) {
-    showChat();
-  }
+  if (nick) showChat();
 </script>
 </body>
 </html>
