@@ -56,9 +56,17 @@ function uploadToCloudinary(base64Data, callback) {
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = crypto.createHash('sha1')
-    .update(`timestamp=${timestamp}${apiSecret}`)
+    .update(`resource_type=video&timestamp=${timestamp}${apiSecret}`)
     .digest('hex');
-  const postData = `file=${encodeURIComponent(base64Data)}&timestamp=${timestamp}&api_key=${apiKey}&signature=${signature}&resource_type=video`;
+
+  const postData = [
+    `file=${encodeURIComponent(base64Data)}`,
+    `timestamp=${timestamp}`,
+    `api_key=${apiKey}`,
+    `signature=${signature}`,
+    `resource_type=video`
+  ].join('&');
+
   const options = {
     hostname: 'api.cloudinary.com',
     path: `/v1_1/${cloudName}/video/upload`,
@@ -68,17 +76,20 @@ function uploadToCloudinary(base64Data, callback) {
       'Content-Length': Buffer.byteLength(postData)
     }
   };
+
   const req = https.request(options, (res) => {
     let data = '';
     res.on('data', chunk => data += chunk);
     res.on('end', () => {
       try {
         const result = JSON.parse(data);
+        console.log('Cloudinary response:', JSON.stringify(result));
         if (result.secure_url) callback(null, result.secure_url);
         else callback(new Error('no url: ' + JSON.stringify(result)));
       } catch (e) { callback(e); }
     });
   });
+
   req.on('error', callback);
   req.write(postData);
   req.end();
