@@ -3,10 +3,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+app.use(express.json({ limit: '10mb' }));
 
 const DB_FILE = path.join(__dirname, 'messages.json');
 const MAX_MESSAGES = 200;
@@ -46,7 +49,79 @@ function broadcastOnline() {
   broadcast({ type: 'online', count: users.length, users });
 }
 
+// Cloudinary upload
+function uploadToCloudinary(base64Data, callback) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  const body = JSON.stringify({
+    file: base64Data,
+    upload_preset: undefined,
+    resource_type: 'video'
+  });
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const crypto = require('crypto');
+  const signature = crypto.createHash('sha1')
+    .update(`timestamp=${timestamp}${apiSecret}`)
+    .digest('hex');
+
+  const postData = `file=${encodeURIComponent(base64Data)}&timestamp=${timestamp}&api_key=${apiKey}&signature=${signature}&resource_type=video`;
+
+  const options = {
+    hostname: 'api.cloudinary.com',
+    path: `/v1_1/${cloudName}/video/upload`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(postData)
+    }
+  };
+
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try {
+        const result = JSON.parse(data);
+        callback(null, result.secure_url);
+      } catch (e) {
+        callback(e);
+      }
+    });
+  });
+
+  req.on('error', callback);
+  req.write(postData);
+  req.end();
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.post('/upload-audio', (req, res) => {
+  const { audio, nick } = req.body;
+  if (!audio || !nick) return res.status(400).json({ error: 'missing data' });
+
+  uploadToCloudinary(audio, (err, url) => {
+    if (err || !url) return res.status(500).json({ error: 'upload failed' });
+
+    const m = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      nick: nick.slice(0, 30),
+      text: '🎤 Sesli mesaj',
+      audioUrl: url,
+      time: new Date().toISOString(),
+      deleted: false
+    };
+
+    messages.push(m);
+    if (messages.length > MAX_MESSAGES) messages = messages.slice(-MAX_MESSAGES);
+    saveMessages(messages);
+    broadcast({ type: 'message', message: m });
+    res.json({ ok: true });
+  });
+});
 
 wss.on('connection', (ws) => {
   cleanOldMessages();
@@ -81,6 +156,7 @@ wss.on('connection', (ws) => {
       if (m && m.nick === msg.nick) {
         m.deleted = true;
         m.text = '';
+        m.audioUrl = null;
         saveMessages(messages);
         broadcast({ type: 'deleted', id: msg.id });
       }
