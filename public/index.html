@@ -8,35 +8,30 @@
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0f0f13;
-      color: #e0e0e0;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      background: #0f0f13; color: #e0e0e0;
+      height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
     }
     header {
-      padding: 12px 16px;
-      background: #17171f;
+      padding: 12px 16px; background: #17171f;
       border-bottom: 1px solid #2a2a3a;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
     }
     header h1 { font-size: 1.2rem; font-weight: 700; color: #a78bfa; letter-spacing: 1px; }
     #header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     #online-count { font-size: 0.8rem; color: #a78bfa; font-weight: 600; display: flex; align-items: center; gap: 4px; }
     #status-dot {
       width: 10px; height: 10px; border-radius: 50%;
-      background: #eab308; display: inline-block;
-      transition: background 0.3s;
+      background: #eab308; display: inline-block; transition: background 0.3s;
     }
     #status-dot.yellow { background: #eab308; animation: blink 0.6s infinite; }
     #status-dot.red { background: #ef4444; animation: none; }
     #status-dot.green { background: #22c55e; animation: none; }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
-    #online-list { font-size: 0.75rem; color: #6b7280; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+    #online-list { font-size: 0.75rem; color: #6b7280; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #change-nick-btn {
+      background: none; border: none; color: #6b7280; cursor: pointer;
+      font-size: 1rem; padding: 4px; display: flex; align-items: center;
+    }
 
     #nick-screen {
       flex: 1; display: flex; align-items: center;
@@ -54,6 +49,15 @@
       padding: 12px 32px; border-radius: 10px; border: none;
       background: #7c3aed; color: #fff; font-size: 1rem;
       cursor: pointer; width: 100%; max-width: 300px; -webkit-appearance: none;
+    }
+    #nick-online {
+      font-size: 0.8rem; color: #6b7280; text-align: center;
+    }
+    #nick-online span {
+      color: #22c55e; font-weight: 600;
+    }
+    #nick-online-list {
+      font-size: 0.75rem; color: #4b5563; text-align: center; max-width: 300px;
     }
 
     #chat-screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
@@ -84,14 +88,14 @@
     .msg.mine.show-delete .delete-btn { display: flex; }
     .deleted-text { font-style: italic; color: #6b7280 !important; font-size: 0.85rem; }
     .system-msg {
-      text-align: center; font-size: 0.75rem; color: #4b5563;
-      padding: 4px 12px; background: #1a1a24; border-radius: 12px;
-      align-self: center;
+      text-align: center; font-size: 0.75rem;
+      padding: 3px 10px; border-radius: 10px; align-self: center;
     }
+    .system-msg.join { background: #14532d; color: #86efac; }
+    .system-msg.leave { background: #450a0a; color: #fca5a5; }
     .audio-bubble {
       display: flex; align-items: center; gap: 8px;
-      padding: 8px 12px; border-radius: 16px;
-      background: #1e1e2e;
+      padding: 8px 12px; border-radius: 16px; background: #1e1e2e; min-width: 160px;
     }
     .msg.mine .audio-bubble { background: #6d28d9; }
     .play-btn {
@@ -100,12 +104,11 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 0.9rem; flex-shrink: 0;
     }
-    .audio-label { font-size: 0.85rem; color: #e0e0e0; }
+    .audio-label { font-size: 0.85rem; color: #e0e0e0; flex: 1; }
 
     #input-area {
       padding: 10px 12px; background: #17171f;
-      border-top: 1px solid #2a2a3a; display: flex; gap: 8px; align-items: center;
-      flex-shrink: 0;
+      border-top: 1px solid #2a2a3a; display: flex; gap: 8px; align-items: center; flex-shrink: 0;
     }
     #msg-input { flex: 1; padding: 11px 16px; border-radius: 24px; }
     #send-btn, #mic-btn {
@@ -128,13 +131,16 @@
       <span id="online-num">0</span>
     </span>
     <span id="online-list"></span>
+    <button id="change-nick-btn" title="İsim değiştir">✏️</button>
   </div>
 </header>
 
 <div id="nick-screen">
   <h2>Takma adını gir</h2>
   <input id="nick-input" type="text" placeholder="nick..." maxlength="30" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
-  <button id="nick-btn">Giriş Yap</button>
+  <button id="nick-btn">Katıl</button>
+  <div id="nick-online">Şu an <span id="nick-online-num">0</span> kişi çevrimiçi</div>
+  <div id="nick-online-list"></div>
 </div>
 
 <div id="chat-screen">
@@ -153,6 +159,8 @@
   let mediaRecorder = null;
   let audioChunks = [];
   let isRecording = false;
+  let currentAudio = null;
+  let currentPlayBtn = null;
 
   const nickScreen = document.getElementById('nick-screen');
   const chatScreen = document.getElementById('chat-screen');
@@ -165,6 +173,12 @@
   const onlineNum = document.getElementById('online-num');
   const onlineList = document.getElementById('online-list');
   const statusDot = document.getElementById('status-dot');
+  const changeNickBtn = document.getElementById('change-nick-btn');
+  const nickOnlineNum = document.getElementById('nick-online-num');
+  const nickOnlineList = document.getElementById('nick-online-list');
+
+  // Önceki nick varsa input'a yaz
+  if (nick) nickInput.value = nick;
 
   function setStatus(s) { statusDot.className = s; }
 
@@ -177,12 +191,20 @@
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function addSystemMsg(text) {
+  function addSystemMsg(text, type) {
     const div = document.createElement('div');
-    div.className = 'system-msg';
+    div.className = 'system-msg ' + (type || '');
     div.textContent = text;
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function getSupportedMimeType() {
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
+    for (const t of types) {
+      if (MediaRecorder.isTypeSupported(t)) return t;
+    }
+    return '';
   }
 
   function addMessage(msg, isMine) {
@@ -191,13 +213,12 @@
     div.dataset.id = msg.id;
 
     let bubbleHtml = '';
-
     if (msg.deleted) {
       bubbleHtml = `<div class="msg-bubble deleted-text">Bu mesaj silindi</div>`;
     } else if (msg.audioUrl) {
       bubbleHtml = `
         <div class="audio-bubble">
-          <button class="play-btn" onclick="playAudio('${msg.audioUrl}', this)">▶</button>
+          <button class="play-btn" data-url="${msg.audioUrl}">▶</button>
           <span class="audio-label">Sesli mesaj</span>
         </div>
       `;
@@ -212,12 +233,19 @@
       ${isMine && !msg.deleted ? `<button class="delete-btn">✕</button>` : ''}
     `;
 
+    // Ses butonu
+    const playBtn = div.querySelector('.play-btn');
+    if (playBtn) {
+      playBtn.addEventListener('click', () => toggleAudio(playBtn, msg.audioUrl));
+    }
+
     if (isMine && !msg.deleted) {
       div.addEventListener('click', function(e) {
         if (e.target.classList.contains('delete-btn')) {
           ws.send(JSON.stringify({ type: 'delete', id: msg.id, nick }));
           return;
         }
+        if (e.target.classList.contains('play-btn')) return;
         document.querySelectorAll('.msg.mine').forEach(m => m.classList.remove('show-delete'));
         div.classList.toggle('show-delete');
       });
@@ -227,11 +255,33 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  function playAudio(url, btn) {
+  function toggleAudio(btn, url) {
+    // Aynı ses çalıyorsa durdur
+    if (currentAudio && currentPlayBtn === btn) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+      currentPlayBtn = null;
+      btn.textContent = '▶';
+      return;
+    }
+    // Başka ses çalıyorsa onu durdur
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      if (currentPlayBtn) currentPlayBtn.textContent = '▶';
+    }
+    // Yeni sesi başlat
     const audio = new Audio(url);
-    btn.textContent = '⏸';
-    audio.play();
-    audio.onended = () => btn.textContent = '▶';
+    currentAudio = audio;
+    currentPlayBtn = btn;
+    btn.textContent = '⏹';
+    audio.play().catch(() => { btn.textContent = '▶'; });
+    audio.onended = () => {
+      btn.textContent = '▶';
+      currentAudio = null;
+      currentPlayBtn = null;
+    };
   }
 
   async function toggleRecording() {
@@ -244,10 +294,11 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        const mimeType = getSupportedMimeType();
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
           stream.getTracks().forEach(t => t.stop());
           await sendAudio(blob);
         };
@@ -264,12 +315,11 @@
   async function sendAudio(blob) {
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = reader.result;
       try {
         await fetch('/upload-audio', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: base64, nick })
+          body: JSON.stringify({ audio: reader.result, nick })
         });
       } catch (e) {
         alert('Ses gönderilemedi!');
@@ -277,6 +327,23 @@
     };
     reader.readAsDataURL(blob);
   }
+
+  function connectLobby() {
+    // Nick ekranındayken online sayısını göster
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const lobbyWs = new WebSocket(`${proto}://${location.host}`);
+    lobbyWs.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'online') {
+        nickOnlineNum.textContent = data.count;
+        nickOnlineList.textContent = data.users.length > 0 ? data.users.join(', ') : '';
+      }
+    };
+    lobbyWs.onclose = () => {};
+    return lobbyWs;
+  }
+
+  let lobbyWs = null;
 
   function connect() {
     setStatus('yellow');
@@ -311,7 +378,8 @@
         onlineNum.textContent = data.count;
         onlineList.textContent = data.users.join(', ');
       } else if (data.type === 'system') {
-        addSystemMsg(data.text);
+        const isJoin = data.text.includes('katıldı');
+        addSystemMsg(data.text, isJoin ? 'join' : 'leave');
       }
     };
 
@@ -326,6 +394,7 @@
     if (!n) return;
     nick = n;
     localStorage.setItem(NICK_KEY, nick);
+    if (lobbyWs) { lobbyWs.close(); lobbyWs = null; }
     showChat();
   }
 
@@ -334,6 +403,14 @@
     chatScreen.style.display = 'flex';
     setTimeout(() => msgInput.focus(), 100);
     connect();
+  }
+
+  function showNickScreen() {
+    if (ws) { ws.close(); ws = null; }
+    chatScreen.style.display = 'none';
+    nickScreen.style.display = 'flex';
+    nickInput.value = nick;
+    lobbyWs = connectLobby();
   }
 
   function sendMessage() {
@@ -348,8 +425,14 @@
   nickInput.addEventListener('keydown', e => { if (e.key === 'Enter') enterChat(); });
   sendBtn.addEventListener('click', sendMessage);
   msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+  changeNickBtn.addEventListener('click', showNickScreen);
 
-  if (nick) showChat();
+  // Başlangıç: nick varsa direkt chat, yoksa nick ekranı + lobby bağlantısı
+  if (nick) {
+    showChat();
+  } else {
+    lobbyWs = connectLobby();
+  }
 </script>
 </body>
 </html>
