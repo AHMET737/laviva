@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 
 const DB_FILE = path.join(__dirname, 'messages.json');
 const MAX_MESSAGES = 200;
@@ -29,9 +29,8 @@ function saveMessages(msgs) {
 
 function cleanOldMessages() {
   const cutoff = Date.now() - MAX_AGE_MS;
-  const before = messages.length;
   messages = messages.filter(m => new Date(m.time).getTime() > cutoff);
-  if (messages.length !== before) saveMessages(messages);
+  saveMessages(messages);
 }
 
 let messages = loadMessages();
@@ -56,40 +55,30 @@ function uploadToCloudinary(base64Data, callback) {
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = crypto.createHash('sha1')
-    .update(`resource_type=video&timestamp=${timestamp}${apiSecret}`)
+    .update(`timestamp=${timestamp}${apiSecret}`)
     .digest('hex');
-
-  const postData = [
-    `file=${encodeURIComponent(base64Data)}`,
-    `timestamp=${timestamp}`,
-    `api_key=${apiKey}`,
-    `signature=${signature}`,
-    `resource_type=video`
-  ].join('&');
-
+  const postData = `file=${encodeURIComponent(base64Data)}&timestamp=${timestamp}&api_key=${apiKey}&signature=${signature}`;
   const options = {
     hostname: 'api.cloudinary.com',
-    path: `/v1_1/${cloudName}/video/upload`,
+    path: `/v1_1/${cloudName}/auto/upload`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Content-Length': Buffer.byteLength(postData)
     }
   };
-
   const req = https.request(options, (res) => {
     let data = '';
     res.on('data', chunk => data += chunk);
     res.on('end', () => {
       try {
         const result = JSON.parse(data);
-        console.log('Cloudinary response:', JSON.stringify(result));
+        console.log('Cloudinary:', JSON.stringify(result).slice(0, 200));
         if (result.secure_url) callback(null, result.secure_url);
-        else callback(new Error('no url: ' + JSON.stringify(result)));
+        else callback(new Error(JSON.stringify(result)));
       } catch (e) { callback(e); }
     });
   });
-
   req.on('error', callback);
   req.write(postData);
   req.end();
@@ -99,10 +88,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/upload-audio', (req, res) => {
   const { audio, nick } = req.body;
-  if (!audio || !nick) return res.status(400).json({ error: 'missing data' });
+  if (!audio || !nick) return res.status(400).json({ error: 'missing' });
   uploadToCloudinary(audio, (err, url) => {
     if (err || !url) {
-      console.error('Cloudinary error:', err);
+      console.error('Upload error:', err);
       return res.status(500).json({ error: 'upload failed' });
     }
     const m = {
