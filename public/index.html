@@ -107,7 +107,14 @@
       font-size: 0.9rem; flex-shrink: 0;
     }
     .audio-label { font-size: 0.85rem; color: #e0e0e0; flex: 1; }
-
+    #typing-status {
+      text-align: center; font-size: 0.75rem; color: #6b7280;
+      padding: 2px 12px; min-height: 18px; flex-shrink: 0;
+    }
+    #upload-status {
+      text-align: center; font-size: 0.75rem; color: #a78bfa;
+      padding: 4px; display: none; flex-shrink: 0;
+    }
     #input-area {
       padding: 10px 12px; background: #17171f;
       border-top: 1px solid #2a2a3a; display: flex; gap: 8px; align-items: center; flex-shrink: 0;
@@ -128,10 +135,6 @@
     #send-btn { background: #7c3aed; }
     #mic-btn { background: #1e1e2e; border: 1px solid #3a3a50; font-size: 1.2rem; }
     #mic-btn.recording { background: #ef4444; border-color: #ef4444; animation: blink 0.6s infinite; }
-    #upload-status {
-      text-align: center; font-size: 0.75rem; color: #a78bfa;
-      padding: 4px; display: none; flex-shrink: 0;
-    }
   </style>
 </head>
 <body>
@@ -164,6 +167,7 @@
 
 <div id="chat-screen">
   <div id="messages"></div>
+  <div id="typing-status"></div>
   <div id="upload-status">🎤 Ses yükleniyor...</div>
   <div id="input-area">
     <button id="mic-btn">🎤</button>
@@ -181,6 +185,8 @@
   let mediaRecorder = null;
   let audioChunks = [];
   let isRecording = false;
+  let typingTimeout = null;
+  let typingClearTimeout = null;
 
   const lobbyScreen = document.getElementById('lobby-screen');
   const connectingScreen = document.getElementById('connecting-screen');
@@ -197,6 +203,7 @@
   const lobbyCount = document.getElementById('lobby-count');
   const lobbyNames = document.getElementById('lobby-online-names');
   const uploadStatus = document.getElementById('upload-status');
+  const typingStatus = document.getElementById('typing-status');
 
   if (nick) nickInput.value = nick;
 
@@ -246,7 +253,6 @@
       prev.dataset.time === formatTime(msg.time) &&
       !msg.deleted;
 
-    // Önceki mesajın saatini kaldır, en sona taşıyacağız
     if (sameGroup) {
       const prevTime = prev.querySelector('.msg-time');
       if (prevTime) prevTime.remove();
@@ -389,6 +395,12 @@
         onlineList.textContent = data.users.join(', ');
       } else if (data.type === 'system') {
         addSystemMsg(data.text, data.kind);
+      } else if (data.type === 'typing') {
+        typingStatus.textContent = data.nick + ' yazıyor...';
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          typingStatus.textContent = '';
+        }, 2000);
       }
     };
 
@@ -414,6 +426,13 @@
     msgInput.value = '';
     msgInput.focus();
   }
+
+  msgInput.addEventListener('input', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'typing', nick }));
+    clearTimeout(typingClearTimeout);
+    typingClearTimeout = setTimeout(() => {}, 2000);
+  });
 
   micBtn.addEventListener('click', toggleRecording);
   joinBtn.addEventListener('click', enterChat);
