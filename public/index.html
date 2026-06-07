@@ -53,10 +53,14 @@
     .msg.mine.show-delete .delete-btn { display: flex; }
     .deleted-text { font-style: italic; color: #6b7280 !important; font-size: 0.85rem; }
     .system-msg { text-align: center; font-size: 0.75rem; color: #6b7280; padding: 3px 10px; border-radius: 10px; align-self: center; margin: 4px 0; }
-    .audio-bubble { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px; background: #1e1e2e; min-width: 160px; }
+    .audio-bubble { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px; background: #1e1e2e; min-width: 180px; }
     .msg.mine .audio-bubble { background: var(--accent-dark); }
-    .play-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--accent-light); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
-    .audio-label { font-size: 0.85rem; color: #e0e0e0; flex: 1; }
+    .play-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--accent-light); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+    .audio-info { display: flex; flex-direction: column; flex: 1; gap: 2px; }
+    .audio-label { font-size: 0.82rem; color: #e0e0e0; }
+    .audio-duration { font-size: 0.7rem; color: #9ca3af; }
+    .audio-progress-bar { height: 3px; background: #3a3a50; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .audio-progress-fill { height: 100%; background: var(--accent-light); width: 0%; transition: width 0.1s; border-radius: 2px; }
     .file-bubble { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px; background: #1e1e2e; min-width: 160px; text-decoration: none; }
     .msg.mine .file-bubble { background: var(--accent-dark); }
     .file-icon { font-size: 1.4rem; flex-shrink: 0; }
@@ -92,12 +96,9 @@
 <header>
   <h1>laviva</h1>
   <div id="header-right">
-    <span id="online-count">
-      <span id="status-dot" class="yellow"></span>
-      <span id="online-num">0</span>
-    </span>
+    <span id="online-count"><span id="status-dot" class="yellow"></span><span id="online-num">0</span></span>
     <span id="online-list"></span>
-    <button id="theme-btn" title="Tema">🎨</button>
+    <button id="theme-btn">🎨</button>
   </div>
 </header>
 <div id="theme-panel">
@@ -128,14 +129,11 @@
   <div id="typing-status"></div>
   <div id="upload-status">⏳ Yükleniyor...</div>
   <div id="emoji-panel">
-    <div id="emoji-panel-header">
-      <span>Emoji seç</span>
-      <button id="emoji-close">✕</button>
-    </div>
+    <div id="emoji-panel-header"><span>Emoji seç</span><button id="emoji-close">✕</button></div>
     <div id="emoji-grid"></div>
   </div>
   <div id="input-area">
-    <button id="file-btn" title="Dosya">📎</button>
+    <button id="file-btn">📎</button>
     <button id="mic-btn">🎤</button>
     <button id="emoji-btn">😊</button>
     <input id="msg-input" type="text" placeholder="Mesaj yaz..." maxlength="500" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
@@ -151,8 +149,8 @@
   let ws = null, lobbyWs = null;
   let mediaRecorder = null, audioChunks = [], isRecording = false;
   let typingTimeout = null, typingClearTimeout = null;
-  let unreadCount = 0;
-  let pageVisible = true;
+  let unreadCount = 0, pageVisible = true;
+  let currentAudio = null, currentPlayBtn = null, currentFill = null, currentDuration = null;
 
   const lobbyScreen = document.getElementById('lobby-screen');
   const connectingScreen = document.getElementById('connecting-screen');
@@ -196,27 +194,14 @@
   const savedTheme = localStorage.getItem(THEME_KEY);
   if (savedTheme) { try { const t = JSON.parse(savedTheme); applyTheme(t.accent, t.dark, t.light); } catch(e) {} }
   themeBtn.addEventListener('click', (e) => { e.stopPropagation(); themePanel.classList.toggle('open'); emojiPanel.classList.remove('open'); });
-  document.addEventListener('click', () => { themePanel.classList.remove('open'); });
+  document.addEventListener('click', () => themePanel.classList.remove('open'));
   themePanel.addEventListener('click', e => e.stopPropagation());
   document.querySelectorAll('.theme-dot').forEach(dot => {
     dot.addEventListener('click', () => applyTheme(dot.dataset.accent, dot.dataset.dark, dot.dataset.light));
   });
 
   // Emoji
-  const EMOJIS = [
-    '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘',
-    '😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥',
-    '😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝','🤤','😒','😓','😔',
-    '😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨',
-    '😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','😷','🤒',
-    '🤕','🤢','🤮','🤧','🥴','😇','🥳','🥺','🤠','🤡','🤥','🤫','🤭','🧐','🤓',
-    '😈','👿','👹','👺','💀','☠️','👻','👽','👾','🤖','💩','😺','😸','😹','😻',
-    '👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆',
-    '🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏',
-    '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗',
-    '💖','💘','💝','💟','☮️','✝️','☯️','🔥','💫','⭐','🌟','💥','❄️','🌈','🎉',
-    '🎊','🎈','🎁','🏆','🥇','⚽','🏀','🍕','🍔','🍣','☕','🍺','🚀','✈️','🌍'
-  ];
+  const EMOJIS = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','🥴','😇','🥳','🥺','🤠','🤡','🤥','🤫','🤭','🧐','🤓','😈','👿','👹','👺','💀','☠️','👻','👽','👾','🤖','💩','😺','😸','😹','😻','👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','🔥','💫','⭐','🌟','💥','❄️','🌈','🎉','🎊','🎈','🎁','🏆','🥇','⚽','🏀','🍕','🍔','🍣','☕','🍺','🚀','✈️','🌍','😴','🌙','☀️','🌊','🎵','🎶','💎','🔑','💡','📱','💻','🖥️','⌨️','🖱️','📷','🎥','📹','🎤','🎧','🎸','🎹','🎺','🥁','🎮','🕹️','👑','💍','👓','🕶️','🌸','🌺','🌻','🌹','🌷','🍀','🌿','🌱','🍁','🍂'];
   EMOJIS.forEach(em => {
     const span = document.createElement('span');
     span.className = 'emoji-item';
@@ -224,22 +209,16 @@
     span.addEventListener('click', () => {
       const start = msgInput.selectionStart;
       const end = msgInput.selectionEnd;
-      const val = msgInput.value;
-      msgInput.value = val.slice(0, start) + em + val.slice(end);
+      msgInput.value = msgInput.value.slice(0, start) + em + msgInput.value.slice(end);
       msgInput.selectionStart = msgInput.selectionEnd = start + em.length;
       msgInput.focus();
     });
     emojiGrid.appendChild(span);
   });
-  emojiBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    emojiPanel.classList.toggle('open');
-    themePanel.classList.remove('open');
-    if (emojiPanel.classList.contains('open')) msgInput.focus();
-  });
+  emojiBtn.addEventListener('click', (e) => { e.stopPropagation(); emojiPanel.classList.toggle('open'); themePanel.classList.remove('open'); if (emojiPanel.classList.contains('open')) msgInput.focus(); });
   emojiClose.addEventListener('click', () => emojiPanel.classList.remove('open'));
 
-  // Bildirim
+  // Sayfa görünürlüğü
   document.addEventListener('visibilitychange', () => {
     pageVisible = !document.hidden;
     if (pageVisible) { unreadCount = 0; document.title = 'Laviva'; }
@@ -251,7 +230,7 @@
     document.title = `(${unreadCount}) Laviva`;
     if (navigator.vibrate) navigator.vibrate(100);
     if (Notification.permission === 'granted') {
-      new Notification('Laviva', { body: msg.nick + ': ' + (msg.audioUrl ? '🎤 Sesli mesaj' : msg.fileUrl ? '📎 Dosya' : msg.text), icon: '/favicon.ico' });
+      new Notification('Laviva', { body: msg.nick + ': ' + (msg.audioUrl ? '🎤 Sesli mesaj' : msg.fileUrl ? '📎 Dosya' : msg.text) });
     }
   }
 
@@ -261,18 +240,51 @@
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.25);
     } catch(e) {}
   }
 
   if ('Notification' in window && Notification.permission === 'default') {
-    setTimeout(() => {
-      Notification.requestPermission();
-    }, 3000);
+    setTimeout(() => Notification.requestPermission(), 3000);
+  }
+
+  // Ses oynatma — durdurma + progress
+  function toggleAudio(btn, url, fillEl, durationEl) {
+    if (currentAudio && currentPlayBtn === btn) {
+      currentAudio.pause(); currentAudio.currentTime = 0;
+      currentAudio = null; currentPlayBtn = null;
+      btn.textContent = '▶';
+      if (fillEl) fillEl.style.width = '0%';
+      return;
+    }
+    if (currentAudio) {
+      currentAudio.pause(); currentAudio.currentTime = 0;
+      if (currentPlayBtn) currentPlayBtn.textContent = '▶';
+      if (currentFill) currentFill.style.width = '0%';
+    }
+    const audio = new Audio(url);
+    currentAudio = audio; currentPlayBtn = btn; currentFill = fillEl;
+    btn.textContent = '⏹';
+    audio.play().catch(() => { btn.textContent = '▶'; });
+    audio.ontimeupdate = () => {
+      if (fillEl && audio.duration) fillEl.style.width = (audio.currentTime / audio.duration * 100) + '%';
+      if (durationEl && audio.duration) {
+        const rem = Math.ceil(audio.duration - audio.currentTime);
+        durationEl.textContent = '0:' + String(rem).padStart(2,'0');
+      }
+    };
+    audio.onended = () => {
+      btn.textContent = '▶';
+      if (fillEl) fillEl.style.width = '0%';
+      if (durationEl) durationEl.textContent = '';
+      currentAudio = null; currentPlayBtn = null; currentFill = null;
+    };
   }
 
   // Lightbox
@@ -310,7 +322,15 @@
 
   function getBubbleHtml(msg) {
     if (msg.deleted) return `<div class="msg-bubble deleted-text">Bu mesaj silindi</div>`;
-    if (msg.audioUrl) return `<div class="audio-bubble"><button class="play-btn" data-url="${escapeHtml(msg.audioUrl)}">▶</button><span class="audio-label">Sesli mesaj</span></div>`;
+    if (msg.audioUrl) return `
+      <div class="audio-bubble">
+        <button class="play-btn" data-url="${escapeHtml(msg.audioUrl)}">▶</button>
+        <div class="audio-info">
+          <span class="audio-label">Sesli mesaj</span>
+          <span class="audio-duration"></span>
+          <div class="audio-progress-bar"><div class="audio-progress-fill"></div></div>
+        </div>
+      </div>`;
     if (msg.fileUrl) {
       if (msg.fileType && msg.fileType.startsWith('image/')) return `<img class="msg-img" src="${escapeHtml(msg.fileUrl)}" alt="foto" />`;
       if (msg.fileType && msg.fileType.startsWith('video/')) return `<video class="msg-video" src="${escapeHtml(msg.fileUrl)}" controls></video>`;
@@ -319,7 +339,7 @@
     return `<div class="msg-bubble">${escapeHtml(msg.text)}</div>`;
   }
 
-    function addMessage(msg, isMine) {
+  function addMessage(msg, isMine) {
     const div = document.createElement('div');
     div.className = 'msg ' + (isMine ? 'mine' : 'other');
     div.dataset.id = msg.id;
@@ -339,7 +359,14 @@
     `;
 
     const playBtn = div.querySelector('.play-btn');
-    if (playBtn) playBtn.addEventListener('click', (e) => { e.stopPropagation(); new Audio(playBtn.dataset.url).play().catch(()=>{}); });
+    if (playBtn) {
+      const fillEl = div.querySelector('.audio-progress-fill');
+      const durationEl = div.querySelector('.audio-duration');
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleAudio(playBtn, playBtn.dataset.url, fillEl, durationEl);
+      });
+    }
 
     const imgEl = div.querySelector('.msg-img');
     if (imgEl) imgEl.addEventListener('click', () => { lightboxImg.src = imgEl.src; lightbox.classList.add('open'); });
