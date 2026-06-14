@@ -17,7 +17,7 @@ const MAX_MESSAGES = 200;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 // TR saatiyle 11 Haziran Perşembe 23:59:59
-const SHUTDOWN_TIME = new Date('2026-06-11T23:59:59+03:00').getTime();
+const SHUTDOWN_TIME = new Date('2030-12-31T23:59:59+03:00').getTime();
 
 function loadMessages() {
   try {
