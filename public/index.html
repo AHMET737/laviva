@@ -3,318 +3,745 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
-  <title>Laviva - Çoklu Oda Chat</title>
+  <title>Laviva</title>
   <style>
-    :root {
-      --accent: #7c3aed; --accent-dark: #6d28d9;
-      --accent-light: #a78bfa; --accent-bubble: #7c3aed;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root { --accent:#7c3aed; --accent-dark:#6d28d9; --accent-light:#a78bfa; --accent-bubble:#7c3aed; }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0a0f; color:#e0e0e0; height:100dvh; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+    #bg-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    header,#room-select-screen,#lobby-screen,#connecting-screen,#chat-screen,#closed-screen,#admin-screen { position:relative; z-index:1; }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0a0a0f; color: #e0e0e0;
-      height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
-      position: relative;
-    }
-    #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-    header, #lobby-screen, #connecting-screen, #chat-screen, #closed-screen {
-      position: relative; z-index: 1;
-    }
+    /* HEADER */
+    header { padding:12px 16px; background:rgba(23,23,31,0.85); backdrop-filter:blur(12px); border-bottom:1px solid rgba(167,139,250,0.15); display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    header h1 { font-size:1.3rem; font-weight:800; letter-spacing:2px; background:linear-gradient(135deg,#a78bfa,#60a5fa,#a78bfa); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:shimmer 3s linear infinite; }
+    @keyframes shimmer { to { background-position:200% center; } }
+    #header-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+    #online-count { font-size:0.8rem; color:var(--accent-light); font-weight:600; display:flex; align-items:center; gap:4px; }
+    #status-dot { width:10px; height:10px; border-radius:50%; background:#eab308; display:inline-block; transition:background 0.3s; }
+    #status-dot.yellow { background:#eab308; animation:blink 0.6s infinite; }
+    #status-dot.red    { background:#ef4444; animation:none; }
+    #status-dot.green  { background:#22c55e; animation:none; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+    #online-list { font-size:0.75rem; color:#6b7280; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #theme-btn,#back-btn { background:none; border:none; color:#6b7280; cursor:pointer; font-size:1.1rem; padding:4px; display:flex; align-items:center; }
+    #back-btn { display:none; }
+    #theme-panel { display:none; position:fixed; top:52px; right:12px; background:rgba(30,30,46,0.95); backdrop-filter:blur(12px); border:1px solid #2a2a3a; border-radius:12px; padding:12px; z-index:100; gap:8px; flex-wrap:wrap; width:180px; }
+    #theme-panel.open { display:flex; }
+    .theme-dot { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+    .theme-dot.active { border-color:#fff; }
 
-    header {
-      padding: 12px 16px; background: rgba(23,23,31,0.85);
-      backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.08);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.2rem; color: #fff; }
-    .brand span { background: linear-gradient(135deg, var(--accent-light), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    
-    .room-badge {
-      font-size: 0.8rem; background: rgba(124, 58, 237, 0.2); border: 1px solid var(--accent);
-      padding: 4px 8px; border-radius: 12px; color: var(--accent-light); font-weight: 600;
-    }
+    /* ODA SEÇİM EKRANI */
+    #room-select-screen { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; }
+    .room-select-card { background:rgba(23,23,31,0.7); backdrop-filter:blur(20px); border:1px solid rgba(167,139,250,0.2); border-radius:20px; padding:28px 24px; display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; max-width:340px; }
+    .room-select-title { font-size:1.5rem; font-weight:800; letter-spacing:2px; background:linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .room-select-sub { font-size:0.8rem; color:#4b5563; text-align:center; }
+    #rooms-grid { display:flex; flex-direction:column; gap:10px; width:100%; }
+    .room-btn { padding:13px 16px; border-radius:12px; border:1px solid rgba(167,139,250,0.25); background:rgba(15,15,20,0.8); color:#e0e0e0; font-size:0.95rem; font-weight:600; cursor:pointer; width:100%; text-align:left; display:flex; align-items:center; gap:10px; transition:border-color 0.2s,background 0.2s; }
+    .room-btn:hover { border-color:var(--accent-light); background:rgba(124,58,237,0.1); }
+    .room-btn .room-icon { font-size:1.2rem; }
+    .room-btn .room-name { flex:1; }
+    .room-btn .room-lock { font-size:0.85rem; color:#4b5563; }
 
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; transition: background 0.3s; }
-    .status-dot.green { background: #10b981; box-shadow: 0 0 8px #10b981; }
-    .status-dot.orange { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-    .status-dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    /* ŞİFRE GİRİŞ EKRANI (LOBİ) */
+    #lobby-screen { flex:1; display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; }
+    .lobby-card { background:rgba(23,23,31,0.7); backdrop-filter:blur(20px); border:1px solid rgba(167,139,250,0.2); border-radius:20px; padding:32px 28px; display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; max-width:320px; }
+    .lobby-title { font-size:1.5rem; font-weight:800; letter-spacing:2px; background:linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .lobby-sub { font-size:0.8rem; color:#4b5563; text-align:center; }
+    #selected-room-name { font-size:0.9rem; color:var(--accent-light); font-weight:700; background:rgba(124,58,237,0.15); padding:6px 14px; border-radius:20px; border:1px solid rgba(124,58,237,0.3); }
+    #nick-input,#room-pass-input { -webkit-appearance:none; appearance:none; padding:12px 18px; border-radius:12px; border:1px solid rgba(167,139,250,0.3); background:rgba(15,15,20,0.8); color:#fff; font-size:1rem; outline:none; -webkit-user-select:text; user-select:text; width:100%; transition:border-color 0.2s; }
+    #nick-input:focus,#room-pass-input:focus { border-color:var(--accent-light); }
+    #join-btn { padding:13px 32px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),#4f46e5); color:#fff; font-size:1rem; font-weight:600; cursor:pointer; width:100%; box-shadow:0 4px 20px rgba(124,58,237,0.4); transition:transform 0.1s,box-shadow 0.2s; }
+    #join-btn:active { transform:scale(0.97); }
+    #lobby-error { font-size:0.82rem; color:#f87171; min-height:18px; text-align:center; }
 
-    main { flex: 1; display: flex; flex-direction: column; position: relative; }
-    .screen { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-    .screen.active { opacity: 1; pointer-events: auto; }
+    /* BAĞLANIYOR */
+    #connecting-screen { flex:1; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+    #connecting-screen p { color:#9ca3af; font-size:0.95rem; }
+    .spinner { width:32px; height:32px; border:3px solid rgba(167,139,250,0.2); border-top-color:var(--accent-light); border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
-    .card {
-      background: rgba(18,18,26,0.75); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.08); padding: 32px;
-      border-radius: 24px; width: 100%; max-width: 400px; text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-    }
-    .card h2 { margin-bottom: 8px; font-size: 1.6rem; color: #fff; }
-    .card p { color: #9ca3af; font-size: 0.95rem; margin-bottom: 24px; }
+    /* CHAT */
+    #chat-screen { display:none; flex:1; flex-direction:column; overflow:hidden; }
+    #room-label { text-align:center; font-size:0.75rem; color:#4b5563; padding:4px 0; background:rgba(10,10,15,0.5); flex-shrink:0; }
+    #messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:6px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+    .msg { display:flex; flex-direction:column; gap:2px; max-width:80%; position:relative; }
+    .msg.mine { align-self:flex-end; align-items:flex-end; }
+    .msg.other { align-self:flex-start; align-items:flex-start; }
+    .msg-nick { font-size:0.7rem; color:#6b7280; padding:0 4px; margin-top:6px; }
+    .msg.mine .msg-nick { color:var(--accent-light); }
+    .msg-bubble { padding:9px 14px; border-radius:16px; font-size:0.93rem; line-height:1.5; word-break:break-word; }
+    .msg.mine .msg-bubble { background:linear-gradient(135deg,var(--accent),var(--accent-dark)); color:#fff; border-bottom-right-radius:4px; box-shadow:0 2px 12px rgba(124,58,237,0.3); }
+    .msg.other .msg-bubble { background:rgba(30,30,46,0.9); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.05); color:#e0e0e0; border-bottom-left-radius:4px; }
+    .msg-time { font-size:0.65rem; color:#4b5563; padding:0 4px; }
+    .delete-btn { display:none; position:absolute; top:-8px; right:-8px; background:#ef4444; border:none; color:white; border-radius:50%; width:22px; height:22px; font-size:0.7rem; cursor:pointer; align-items:center; justify-content:center; z-index:10; }
+    .msg.mine.show-delete .delete-btn { display:flex; }
+    .deleted-text { font-style:italic; color:#4b5563 !important; font-size:0.85rem; }
+    .system-msg { text-align:center; font-size:0.75rem; color:#4b5563; padding:3px 10px; border-radius:10px; align-self:center; margin:4px 0; }
+    .audio-bubble { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:16px; background:rgba(30,30,46,0.9); border:1px solid rgba(255,255,255,0.05); min-width:180px; }
+    .msg.mine .audio-bubble { background:linear-gradient(135deg,var(--accent-dark),#4f46e5); border:none; }
+    .play-btn { width:36px; height:36px; border-radius:50%; border:none; background:var(--accent-light); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+    .audio-info { display:flex; flex-direction:column; flex:1; gap:2px; }
+    .audio-label { font-size:0.82rem; color:#e0e0e0; }
+    .audio-duration { font-size:0.7rem; color:#9ca3af; }
+    .audio-progress-bar { height:3px; background:rgba(255,255,255,0.1); border-radius:2px; margin-top:4px; overflow:hidden; }
+    .audio-progress-fill { height:100%; background:var(--accent-light); width:0%; transition:width 0.1s; border-radius:2px; }
+    .file-bubble { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:16px; background:rgba(30,30,46,0.9); min-width:160px; text-decoration:none; border:1px solid rgba(255,255,255,0.05); }
+    .msg.mine .file-bubble { background:linear-gradient(135deg,var(--accent-dark),#4f46e5); border:none; }
+    .file-icon { font-size:1.4rem; flex-shrink:0; }
+    .file-name { font-size:0.82rem; color:#e0e0e0; word-break:break-all; }
+    .msg-img { max-width:220px; max-height:220px; border-radius:12px; display:block; cursor:pointer; object-fit:cover; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+    .msg-video { max-width:220px; border-radius:12px; display:block; }
+    #typing-status { text-align:center; font-size:0.75rem; color:#4b5563; padding:2px 12px; min-height:18px; flex-shrink:0; }
+    #upload-status { text-align:center; font-size:0.75rem; color:var(--accent-light); padding:4px; display:none; flex-shrink:0; }
+    #input-area { padding:10px 12px; background:rgba(23,23,31,0.85); backdrop-filter:blur(12px); border-top:1px solid rgba(167,139,250,0.1); display:flex; gap:8px; align-items:center; flex-shrink:0; }
+    #msg-input { flex:1; padding:11px 16px; border-radius:24px; -webkit-appearance:none; appearance:none; border:1px solid rgba(167,139,250,0.2); background:rgba(15,15,20,0.8); color:#fff; font-size:1rem; outline:none; -webkit-user-select:text; user-select:text; transition:border-color 0.2s; }
+    #msg-input:focus { border-color:rgba(167,139,250,0.5); }
+    #send-btn,#mic-btn,#file-btn,#emoji-btn { width:44px; height:44px; border-radius:50%; border:none; color:#fff; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; -webkit-appearance:none; }
+    #send-btn { background:linear-gradient(135deg,var(--accent),#4f46e5); box-shadow:0 2px 12px rgba(124,58,237,0.4); }
+    #mic-btn,#file-btn,#emoji-btn { background:rgba(30,30,46,0.8); border:1px solid rgba(255,255,255,0.08); font-size:1.2rem; }
+    #mic-btn.recording { background:#ef4444; border-color:#ef4444; animation:blink 0.6s infinite; }
+    #emoji-panel { display:none; position:fixed; bottom:70px; left:0; right:0; background:rgba(23,23,31,0.95); backdrop-filter:blur(16px); border-top:1px solid rgba(167,139,250,0.15); padding:10px; z-index:50; max-height:220px; overflow-y:auto; }
+    #emoji-panel.open { display:block; }
+    #emoji-panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px; }
+    #emoji-panel-header span { font-size:0.8rem; color:#6b7280; }
+    #emoji-close { background:none; border:none; color:#6b7280; font-size:1.2rem; cursor:pointer; }
+    #emoji-grid { display:flex; flex-wrap:wrap; gap:2px; }
+    .emoji-item { font-size:1.6rem; cursor:pointer; padding:4px; border-radius:8px; line-height:1; }
+    #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; align-items:center; justify-content:center; }
+    #lightbox.open { display:flex; }
+    #lightbox img { max-width:95vw; max-height:95vh; border-radius:8px; }
+    #lightbox-close { position:fixed; top:16px; right:16px; background:none; border:none; color:#fff; font-size:2rem; cursor:pointer; z-index:201; }
 
-    .input-group { position: relative; width: 100%; margin-bottom: 16px; }
-    .input-group input {
-      width: 100%; padding: 14px 16px; background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
-      color: #fff; font-size: 1rem; outline: none; transition: all 0.2s;
-    }
-    .input-group input:focus { border-color: var(--accent); background: rgba(255,255,255,0.07); box-shadow: 0 0 0 3px rgba(124,58,237,0.15); }
+    /* KAPANIŞ */
+    #closed-screen { display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; gap:20px; }
+    #closed-screen.active { display:flex; }
+    .closed-card { background:rgba(23,23,31,0.7); backdrop-filter:blur(20px); border:1px solid rgba(167,139,250,0.2); border-radius:24px; padding:40px 32px; display:flex; flex-direction:column; align-items:center; gap:16px; max-width:320px; }
+    .closed-heart { font-size:2.5rem; animation:heartbeat 2s ease-in-out infinite; }
+    @keyframes heartbeat { 0%,100%{transform:scale(1)}50%{transform:scale(1.15)} }
+    .closed-title { font-size:2rem; font-weight:800; letter-spacing:3px; background:linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .closed-line { width:40px; height:1px; background:rgba(167,139,250,0.2); }
+    .closed-subtitle { font-size:0.88rem; color:#4b5563; line-height:1.9; }
+    .closed-date { font-size:0.75rem; color:#2a2a3a; }
 
-    .btn {
-      width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-      color: #fff; border: none; border-radius: 14px; font-size: 1rem; font-weight: 600;
-      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
-    .btn:active { transform: translateY(1px); }
-
-    #chat-screen { justify-content: flex-start; padding: 0; }
-    .chat-header {
-      width: 100%; padding: 10px 16px; background: rgba(15,15,22,0.6);
-      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; color: #9ca3af;
-    }
-
-        .chat-messages { flex: 1; width: 100%; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-    
-    .msg-row { display: flex; flex-direction: column; width: 100%; max-width: 80%; }
-    .msg-row.me { align-self: flex-end; align-items: flex-end; }
-    .msg-row.other { align-self: flex-start; align-items: flex-start; }
-    
-    .msg-nick { font-size: 0.75rem; color: #9ca3af; margin: 4px 8px 2px 8px; font-weight: 500; }
-    
-    .msg-bubble {
-      padding: 10px 14px; border-radius: 18px; position: relative; font-size: 0.95rem; line-height: 1.4;
-      word-break: break-word; color: #fff; transition: all 0.2s;
-    }
-    .msg-row.me .msg-bubble { background: var(--accent-bubble); border-bottom-right-radius: 4px; }
-    .msg-row.other .msg-bubble { background: rgba(255,255,255,0.08); border-bottom-left-radius: 4px; }
-    
-    .msg-row.me.same-group .msg-bubble { border-bottom-right-radius: 18px; }
-    .msg-row.other.same-group .msg-bubble { border-bottom-left-radius: 18px; }
-    
-    .msg-time { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-top: 4px; text-align: right; display: block; }
-    
-    .sys-msg { align-self: center; text-align: center; font-size: 0.75rem; color: #6b7280; padding: 4px 12px; background: rgba(255,255,255,0.02); border-radius: 10px; margin: 4px 0; border: 1px solid rgba(255,255,255,0.03); }
-    .sys-msg.join { color: #10b981; background: rgba(16,185,129,0.04); }
-    .sys-msg.leave { color: #ef4444; background: rgba(239,68,68,0.04); }
-
-    .chat-footer { width: 100%; padding: 12px; background: rgba(15,15,22,0.85); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 8px; }
-    .input-row { display: flex; align-items: center; gap: 8px; width: 100%; }
-    
-    .chat-input-wrapper { flex: 1; position: relative; display: flex; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 2px 4px 2px 12px; }
-    .chat-input-wrapper input { flex: 1; background: none; border: none; padding: 10px 0; color: #fff; font-size: 0.95rem; outline: none; }
-    
-    .circle-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.05); color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-    .circle-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    .circle-btn.primary { background: var(--accent); color: #fff; }
-    .circle-btn.primary:hover { background: var(--accent-dark); }
-
-    .typing-indicator { font-size: 0.8rem; color: #9ca3af; padding-left: 8px; min-height: 18px; font-style: italic; }
-
-    .spinner { width: 40px; height: 40px; border: 3px solid rgba(124,58,237,0.1); border-radius: 50%; border-top-color: var(--accent); animation: spin 1s linear infinite; margin-bottom: 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ADMİN */
+    #admin-screen { display:none; flex:1; flex-direction:column; overflow:hidden; }
+    #admin-screen.active { display:flex; }
+    #admin-login { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+    #admin-panel { flex:1; display:none; flex-direction:column; overflow:hidden; }
+    #admin-panel.active { display:flex; }
+    .admin-card { background:rgba(23,23,31,0.8); backdrop-filter:blur(20px); border:1px solid rgba(167,139,250,0.2); border-radius:20px; padding:28px 24px; display:flex; flex-direction:column; gap:14px; width:100%; max-width:320px; }
+    .admin-title { font-size:1.3rem; font-weight:800; letter-spacing:2px; background:linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-align:center; }
+    .admin-input { padding:11px 16px; border-radius:12px; border:1px solid rgba(167,139,250,0.3); background:rgba(15,15,20,0.8); color:#fff; font-size:0.95rem; outline:none; width:100%; }
+    .admin-input:focus { border-color:var(--accent-light); }
+    .admin-btn { padding:12px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),#4f46e5); color:#fff; font-size:0.95rem; font-weight:600; cursor:pointer; width:100%; }
+    .admin-btn.danger { background:linear-gradient(135deg,#dc2626,#b91c1c); }
+    .admin-btn.secondary { background:rgba(30,30,46,0.8); border:1px solid rgba(255,255,255,0.1); }
+    #admin-login-error { font-size:0.82rem; color:#f87171; text-align:center; min-height:18px; }
+    #admin-panel-inner { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:16px; }
+    .admin-section-title { font-size:0.8rem; color:#6b7280; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+    .admin-room-card { background:rgba(23,23,31,0.7); border:1px solid rgba(167,139,250,0.15); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+    .admin-room-header { display:flex; align-items:center; gap:8px; }
+    .admin-room-id { font-size:0.75rem; color:#4b5563; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:6px; }
+    .admin-room-online { font-size:0.75rem; color:#22c55e; margin-left:auto; }
+    .admin-room-fields { display:flex; gap:8px; }
+    .admin-room-fields input { flex:1; padding:8px 12px; border-radius:10px; border:1px solid rgba(167,139,250,0.2); background:rgba(15,15,20,0.8); color:#fff; font-size:0.88rem; outline:none; }
+    .admin-room-fields input:focus { border-color:var(--accent-light); }
+    .admin-room-actions { display:flex; gap:8px; }
+    .admin-room-actions button { flex:1; padding:8px; border-radius:10px; border:none; font-size:0.82rem; font-weight:600; cursor:pointer; }
+    .btn-save { background:linear-gradient(135deg,var(--accent),#4f46e5); color:#fff; }
+    .btn-clear { background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.3) !important; color:#fbbf24; }
+    .btn-delete { background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.3) !important; color:#f87171; }
+    .admin-add-section { background:rgba(23,23,31,0.7); border:1px solid rgba(167,139,250,0.15); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+    .admin-add-section input { padding:10px 14px; border-radius:10px; border:1px solid rgba(167,139,250,0.2); background:rgba(15,15,20,0.8); color:#fff; font-size:0.9rem; outline:none; width:100%; }
+    .admin-add-section input:focus { border-color:var(--accent-light); }
+    #admin-msg { font-size:0.8rem; color:#86efac; text-align:center; min-height:18px; }
+    #admin-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:rgba(23,23,31,0.85); border-bottom:1px solid rgba(167,139,250,0.1); flex-shrink:0; }
+    #admin-header span { font-size:0.9rem; font-weight:700; color:var(--accent-light); }
+    #admin-logout-btn { background:none; border:1px solid rgba(255,255,255,0.1); color:#6b7280; border-radius:8px; padding:5px 12px; font-size:0.8rem; cursor:pointer; }
   </style>
 </head>
 <body>
+<canvas id="bg-canvas"></canvas>
+<div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" /></div>
 
-  <canvas id="bg-canvas"></canvas>
+<header>
+  <h1>laviva</h1>
+  <div id="header-right">
+    <span id="online-count"><span id="status-dot" class="yellow"></span><span id="online-num">0</span></span>
+    <span id="online-list"></span>
+    <button id="back-btn" title="Geri">◀</button>
+    <button id="theme-btn">🎨</button>
+  </div>
+</header>
 
-  <header>
-    <div class="brand"><span>LAVIVA</span></div>
-    <div id="room-display" class="room-badge">Oda: Genel</div>
-    <div id="status-dot" class="status-dot"></div>
-  </header>
+<div id="theme-panel">
+  <div class="theme-dot active" style="background:#7c3aed" data-accent="#7c3aed" data-dark="#6d28d9" data-light="#a78bfa"></div>
+  <div class="theme-dot" style="background:#2563eb" data-accent="#2563eb" data-dark="#1d4ed8" data-light="#60a5fa"></div>
+  <div class="theme-dot" style="background:#0891b2" data-accent="#0891b2" data-dark="#0e7490" data-light="#22d3ee"></div>
+  <div class="theme-dot" style="background:#059669" data-accent="#059669" data-dark="#047857" data-light="#34d399"></div>
+  <div class="theme-dot" style="background:#db2777" data-accent="#db2777" data-dark="#be185d" data-light="#f472b6"></div>
+  <div class="theme-dot" style="background:#dc2626" data-accent="#dc2626" data-dark="#b91c1c" data-light="#f87171"></div>
+  <div class="theme-dot" style="background:#d97706" data-accent="#d97706" data-dark="#b45309" data-light="#fbbf24"></div>
+  <div class="theme-dot" style="background:#475569" data-accent="#475569" data-dark="#334155" data-light="#94a3b8"></div>
+</div>
 
-  <main>
-    <div id="lobby-screen" class="screen active">
-      <div class="card">
-        <h2>Sohbete Katıl</h2>
-        <p>Devam etmek için bir takma ad belirleyin.</p>
-        <div class="input-group">
-          <input type="text" id="nick-input" placeholder="Takma adınız..." maxlength="30" autocomplete="off" />
-        </div>
-        <button id="join-btn" class="btn">Giriş Yap</button>
-      </div>
+<!-- ODA SEÇİM -->
+<div id="room-select-screen">
+  <div class="room-select-card">
+    <div class="room-select-title">laviva</div>
+    <div class="room-select-sub">bir oda seç</div>
+    <div id="rooms-grid"></div>
+  </div>
+</div>
+
+<!-- ŞİFRE + NİCK -->
+<div id="lobby-screen">
+  <div class="lobby-card">
+    <div class="lobby-title">laviva</div>
+    <div id="selected-room-name">Oda</div>
+    <div class="lobby-sub">nick ve oda şifresini gir</div>
+    <input id="nick-input" type="text" placeholder="nick..." maxlength="30" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    <input id="room-pass-input" type="password" placeholder="şifre..." autocomplete="off" />
+    <button id="join-btn">Katıl</button>
+    <div id="lobby-error"></div>
+  </div>
+</div>
+
+<!-- BAĞLANIYOR -->
+<div id="connecting-screen"><div class="spinner"></div><p>Bağlanıyor...</p></div>
+
+<!-- CHAT -->
+<div id="chat-screen">
+  <div id="room-label"></div>
+  <div id="messages"></div>
+  <div id="typing-status"></div>
+  <div id="upload-status">⏳ Yükleniyor...</div>
+  <div id="emoji-panel">
+    <div id="emoji-panel-header"><span>Emoji seç</span><button id="emoji-close">✕</button></div>
+    <div id="emoji-grid"></div>
+  </div>
+  <div id="input-area">
+    <button id="file-btn">📎</button>
+    <button id="mic-btn">🎤</button>
+    <button id="emoji-btn">😊</button>
+    <input id="msg-input" type="text" placeholder="Mesaj yaz..." maxlength="500" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    <button id="send-btn">➤</button>
+  </div>
+</div>
+
+<!-- KAPANIŞ -->
+<div id="closed-screen">
+  <div class="closed-card">
+    <div class="closed-heart">💜</div>
+    <div class="closed-title">laviva</div>
+    <div class="closed-line"></div>
+    <div class="closed-subtitle">Bir dönem burada konuştuk, güldük, vakit geçirdik.<br><br>Her şeyin bir sonu var.<br>Bu da bizim sonumuzdu.<br><br>Ama buradaki anlar,<br>bir yerlerde hâlâ yaşıyor.</div>
+    <div class="closed-line"></div>
+    <div class="closed-date">31 Aralık 2030 · 23:59</div>
+  </div>
+</div>
+
+<!-- ADMİN EKRANI -->
+<div id="admin-screen">
+  <!-- Giriş formu -->
+  <div id="admin-login">
+    <div class="admin-card">
+      <div class="admin-title">🔐 Admin</div>
+      <input id="admin-user-input" class="admin-input" type="text" placeholder="Kullanıcı adı" autocomplete="off" />
+      <input id="admin-pass-input" class="admin-input" type="password" placeholder="Şifre" />
+      <button id="admin-login-btn" class="admin-btn">Giriş Yap</button>
+      <div id="admin-login-error"></div>
     </div>
-
-    <div id="connecting-screen" class="screen">
-      <div class="spinner"></div>
-      <p style="color: #9ca3af;">Sunucuya bağlanılıyor...</p>
+  </div>
+  <!-- Panel -->
+  <div id="admin-panel">
+    <div id="admin-header">
+      <span>⚙️ Yönetici Paneli</span>
+      <button id="admin-logout-btn">Çıkış</button>
     </div>
-
-    <div id="chat-screen" class="screen">
-      <div class="chat-header">
-        <span id="online-count">0 Kişi Çevrimiçi</span>
-        <span id="clock-display">00:00</span>
+    <div id="admin-panel-inner">
+      <div class="admin-section-title">Odalar</div>
+      <div id="admin-rooms-list"></div>
+      <div class="admin-section-title" style="margin-top:8px">Yeni Oda Ekle</div>
+      <div class="admin-add-section">
+        <input id="new-room-name" placeholder="Oda adı..." />
+        <input id="new-room-pass" type="password" placeholder="Şifre..." />
+        <button class="admin-btn" id="add-room-btn">+ Oda Ekle</button>
       </div>
-      <div id="chat-messages" class="chat-messages"></div>
-      <div class="chat-footer">
-        <div id="typing-indicator" class="typing-indicator"></div>
-        <div class="input-row">
-          <div class="chat-input-wrapper">
-            <input type="text" id="msg-input" placeholder="Mesajınızı yazın..." maxlength="500" autocomplete="off" />
-          </div>
-          <button id="send-btn" class="circle-btn primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-          </button>
-        </div>
-      </div>
+      <div id="admin-msg"></div>
     </div>
+  </div>
+</div>
 
-    <div id="closed-screen" class="screen">
-      <div class="card">
-        <h2 style="color:#ef4444;">Süre Doldu</h2>
-        <p>Bu uygulamanın kullanım süresi sona ermiştir.</p>
-      </div>
-    </div>
-  </main>
+<input type="file" id="file-input" accept="image/*,video/*,application/pdf,.doc,.docx,.txt" style="display:none" />
+<script>
+  const NICK_KEY  = 'laviva_nick';
+  const THEME_KEY = 'laviva_theme';
+  let nick = localStorage.getItem(NICK_KEY) || '';
+  let ws = null;
+  let selectedRoomId = null, selectedRoomPass = null;
+  let mediaRecorder = null, audioChunks = [], isRecording = false;
+  let typingTimeout = null, typingClearTimeout = null;
+  let unreadCount = 0, pageVisible = true;
+  let currentAudio = null, currentPlayBtn = null, currentFill = null;
+  let SHUTDOWN_TIME = new Date('2030-12-31T23:59:59+03:00').getTime();
+  let isClosed = false;
+  let adminToken = sessionStorage.getItem('laviva_admin_token') || null;
 
-    <script>
-    // URL'den dinamik oda kodunu yakala (Örn: /123 -> "123"). Boşsa "Genel" yap.
-    const currentRoom = window.location.pathname.split('/')[1] || 'default';
-    document.getElementById('room-display').innerText = 'Oda: ' + (currentRoom === 'default' ? 'Genel' : currentRoom);
+  // DOM refs
+  const roomSelectScreen  = document.getElementById('room-select-screen');
+  const lobbyScreen       = document.getElementById('lobby-screen');
+  const connectingScreen  = document.getElementById('connecting-screen');
+  const chatScreen        = document.getElementById('chat-screen');
+  const closedScreen      = document.getElementById('closed-screen');
+  const adminScreen       = document.getElementById('admin-screen');
+  const adminLogin        = document.getElementById('admin-login');
+  const adminPanel        = document.getElementById('admin-panel');
+  const nickInput         = document.getElementById('nick-input');
+  const roomPassInput     = document.getElementById('room-pass-input');
+  const joinBtn           = document.getElementById('join-btn');
+  const lobbyError        = document.getElementById('lobby-error');
+  const selectedRoomName  = document.getElementById('selected-room-name');
+  const messagesEl        = document.getElementById('messages');
+  const msgInput          = document.getElementById('msg-input');
+  const sendBtn           = document.getElementById('send-btn');
+  const micBtn            = document.getElementById('mic-btn');
+  const fileBtn           = document.getElementById('file-btn');
+  const fileInput         = document.getElementById('file-input');
+  const emojiBtn          = document.getElementById('emoji-btn');
+  const emojiPanel        = document.getElementById('emoji-panel');
+  const emojiGrid         = document.getElementById('emoji-grid');
+  const emojiClose        = document.getElementById('emoji-close');
+  const uploadStatus      = document.getElementById('upload-status');
+  const typingStatus      = document.getElementById('typing-status');
+  const onlineNum         = document.getElementById('online-num');
+  const onlineList        = document.getElementById('online-list');
+  const statusDot         = document.getElementById('status-dot');
+  const lightbox          = document.getElementById('lightbox');
+  const lightboxImg       = document.getElementById('lightbox-img');
+  const lightboxClose     = document.getElementById('lightbox-close');
+  const themeBtn          = document.getElementById('theme-btn');
+  const themePanel        = document.getElementById('theme-panel');
+  const backBtn           = document.getElementById('back-btn');
+  const roomLabel         = document.getElementById('room-label');
+  const roomsGrid         = document.getElementById('rooms-grid');
 
-    const NICK_KEY = 'laviva_nick';
-    let ws = null, nick = '', isClosed = false, lastMsgNick = '', lastMsgTime = 0, typingClearTimeout = null;
+  // ── EKRANLAR ────────────────────────────────────────────────────────────────
+  const ALL_SCREENS = [roomSelectScreen,lobbyScreen,connectingScreen,chatScreen,closedScreen,adminScreen];
+  function showScreen(name) {
+    ALL_SCREENS.forEach(s => { if (s) { s.style.display='none'; } });
+    backBtn.style.display = 'none';
+    onlineNum.parentElement.style.display = 'none';
+    onlineList.style.display = 'none';
+    if (name === 'room-select') { roomSelectScreen.style.display='flex'; }
+    else if (name === 'lobby')  { lobbyScreen.style.display='flex'; backBtn.style.display='flex'; }
+    else if (name === 'connecting') { connectingScreen.style.display='flex'; }
+    else if (name === 'chat')   { chatScreen.style.display='flex'; backBtn.style.display='flex'; onlineNum.parentElement.style.display='flex'; onlineList.style.display='inline'; setTimeout(scrollBottom,100); }
+    else if (name === 'closed') { closedScreen.style.display='flex'; }
+    else if (name === 'admin')  { adminScreen.style.display='flex'; adminScreen.classList.add('active'); }
+  }
 
-    // DOM Elementleri
-    const dot = document.getElementById('status-dot');
-    const lobbyScreen = document.getElementById('lobby-screen');
-    const connScreen = document.getElementById('connecting-screen');
-    const chatScreen = document.getElementById('chat-screen');
-    const closedScreen = document.getElementById('closed-screen');
-    const nickInput = document.getElementById('nick-input');
-    const joinBtn = document.getElementById('join-btn');
-    const chatMessages = document.getElementById('chat-messages');
-    const msgInput = document.getElementById('msg-input');
-    const sendBtn = document.getElementById('send-btn');
-    const onlineCount = document.getElementById('online-count');
-    const typingIndicator = document.getElementById('typing-indicator');
-    const clockDisplay = document.getElementById('clock-display');
-
-    // ARKA PLAN ANIMASYONU (Canvas)
-    const canvas = document.getElementById('bg-canvas');
-    const ctx = canvas.getContext('2d');
-    let particles = [];
-    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.addEventListener('resize', resizeCanvas); resizeCanvas();
-
-    class Particle {
-      constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 1.5 + 0.5; this.speedY = Math.random() * -0.3 - 0.1; this.opacity = Math.random() * 0.5 + 0.2; }
-      update() { this.y += this.speedY; if (this.y < 0) { this.y = canvas.height; this.x = Math.random() * canvas.width; } }
-      draw() { ctx.fillStyle = `rgba(167, 139, 250, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+  backBtn.addEventListener('click', () => {
+    if (chatScreen.style.display === 'flex') {
+      if (ws) { ws.close(); ws = null; }
+      selectedRoomId = null; selectedRoomPass = null;
+      loadRooms();
+      showScreen('room-select');
+    } else if (lobbyScreen.style.display === 'flex') {
+      showScreen('room-select');
     }
-    for (let i = 0; i < 40; i++) particles.push(new Particle());
-    function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animate); }
-    animate();
+  });
 
-    // Zaman ve Durum Ayarları
-    setInterval(() => { const d = new Date(); clockDisplay.innerText = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }, 1000);
-    function setStatus(c) { dot.className = 'status-dot ' + c; }
-    function showScreen(s) { [lobbyScreen, connScreen, chatScreen, closedScreen].forEach(e => e.classList.remove('active')); s.classList.add('active'); }
+  // ── TEMA ─────────────────────────────────────────────────────────────────────
+  function applyTheme(accent, dark, light) {
+    document.documentElement.style.setProperty('--accent', accent);
+    document.documentElement.style.setProperty('--accent-dark', dark);
+    document.documentElement.style.setProperty('--accent-light', light);
+    document.documentElement.style.setProperty('--accent-bubble', accent);
+    localStorage.setItem(THEME_KEY, JSON.stringify({accent,dark,light}));
+    document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('active', d.dataset.accent === accent));
+  }
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  if (savedTheme) { try { const t=JSON.parse(savedTheme); applyTheme(t.accent,t.dark,t.light); } catch(e){} }
+  themeBtn.addEventListener('click', e => { e.stopPropagation(); themePanel.classList.toggle('open'); emojiPanel.classList.remove('open'); });
+  document.addEventListener('click', () => themePanel.classList.remove('open'));
+  themePanel.addEventListener('click', e => e.stopPropagation());
+  document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.accent, dot.dataset.dark, dot.dataset.light)));
 
-    // Kayıtlı Nick Varsa Doldur
-    const savedNick = localStorage.getItem(NICK_KEY);
-    if (savedNick) nickInput.value = savedNick;
+  // ── ODALAR ──────────────────────────────────────────────────────────────────
+  const ROOM_ICONS = ['🏠','💬','🌙','⭐','🔮','🎭','🌊','🔥'];
+  async function loadRooms() {
+    try {
+      const res = await fetch('/rooms');
+      const rooms = await res.json();
+      roomsGrid.innerHTML = '';
+      rooms.forEach((r, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'room-btn';
+        btn.innerHTML = `<span class="room-icon">${ROOM_ICONS[i % ROOM_ICONS.length]}</span><span class="room-name">${escapeHtml(r.name)}</span><span class="room-lock">🔒</span>`;
+        btn.addEventListener('click', () => selectRoom(r.id, r.name));
+        roomsGrid.appendChild(btn);
+      });
+    } catch(e) { roomsGrid.innerHTML = '<div style="color:#4b5563;font-size:0.85rem;text-align:center">Odalar yüklenemedi</div>'; }
+  }
 
-    // WEBSOCKET BAĞLANTISI
-    function connectChat() {
-      if (ws) return;
-      setStatus('orange');
-      showScreen(connScreen);
+  function selectRoom(id, name) {
+    selectedRoomId = id;
+    selectedRoomName.textContent = name;
+    lobbyError.textContent = '';
+    nickInput.value = localStorage.getItem(NICK_KEY) || '';
+    roomPassInput.value = '';
+    showScreen('lobby');
+    setTimeout(() => nickInput.focus(), 200);
+  }
 
-      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      // Sunucuya hangi odada olduğumuzu query parametresiyle bildiriyoruz
-      ws = new WebSocket(protocol + window.location.host + '?room=' + encodeURIComponent(currentRoom));
-
-      ws.onopen = () => {
-        setStatus('green');
-        showScreen(chatScreen);
-        ws.send(JSON.stringify({ type: 'join', nick }));
-      };
-
-      ws.onmessage = (e) => {
-        let msg; try { msg = JSON.parse(e.data); } catch(err) { return; }
-
-        if (msg.type === 'system') {
-          if (msg.text.includes('Süre dolmuştur')) { isClosed = true; showScreen(closedScreen); setStatus('red'); return; }
-          const div = document.createElement('div'); div.className = 'sys-msg ' + (msg.kind || ''); div.innerText = msg.text;
-          chatMessages.appendChild(div); scrollBottom();
-        }
-        
-        if (msg.type === 'online') onlineCount.innerText = msg.count + ' Kişi Çevrimiçi';
-        
-        if (msg.type === 'typing') {
-          typingIndicator.innerText = msg.nick + ' yazıyor...';
-          clearTimeout(typingClearTimeout); typingClearTimeout = setTimeout(() => { typingIndicator.innerText = ''; }, 2000);
-        }
-        
-        if (msg.type === 'history') { chatMessages.innerHTML = ''; msg.messages.forEach(appendMessage); scrollBottom(); }
-        if (msg.type === 'message') { appendMessage(msg.message); scrollBottom(); }
-        if (msg.type === 'delete') { const el = document.getElementById('msg_' + msg.id); if (el) { el.querySelector('.msg-bubble').innerText = 'Bu mesaj silindi.'; el.querySelector('.msg-bubble').style.fontStyle = 'italic'; el.querySelector('.msg-bubble').style.opacity = '0.5'; } }
-      };
-
-      ws.onclose = () => { setStatus('red'); ws = null; if (!isClosed) setTimeout(connectChat, 3000); };
-    }
-
-    function appendMessage(m) {
-      const isMe = m.nick === nick;
-      const mTime = new Date(m.time).getTime();
-      const sameUser = (lastMsgNick === m.nick) && (mTime - lastMsgTime < 60000);
-      
-      const row = document.createElement('div');
-      row.id = 'msg_' + m.id;
-      row.className = `msg-row ${isMe ? 'me' : 'other'} ${sameUser ? 'same-group' : ''}`;
-
-      if (!sameUser && !isMe) {
-        const nDiv = document.createElement('div'); nDiv.className = 'msg-nick'; nDiv.innerText = m.nick;
-        chatMessages.appendChild(nDiv);
+  // ── BAĞLANTI ────────────────────────────────────────────────────────────────
+  function connectChat(roomId, password) {
+    if (isClosed) return;
+    showScreen('connecting'); setStatus('yellow');
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}`);
+    ws.onopen = () => {
+      setStatus('green');
+      ws.send(JSON.stringify({ type:'join', nick, roomId, password }));
+    };
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'error') {
+        setStatus('red'); ws.close(); ws = null;
+        lobbyError.textContent = data.text || 'Hata';
+        showScreen('lobby'); return;
       }
-
-      const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
-      
-      if (m.deleted) {
-        bubble.innerText = 'Bu mesaj silindi.'; bubble.style.fontStyle = 'italic'; bubble.style.opacity = '0.5';
-      } else {
-        bubble.innerText = m.text;
-        if (isMe) {
-          bubble.style.cursor = 'pointer';
-          bubble.onclick = () => { if (confirm('Bu mesajı silmek istiyor musunuz?')) ws.send(JSON.stringify({ type: 'delete', id: m.id, nick })); };
-        }
+      if (data.type === 'history') {
+        roomLabel.textContent = selectedRoomName.textContent;
+        showScreen('chat');
+        setTimeout(() => msgInput.focus(), 300);
+        messagesEl.innerHTML = '';
+        data.messages.forEach(msg => addMessage(msg, msg.nick === nick));
       }
+      else if (data.type === 'shutdown')  { SHUTDOWN_TIME = data.shutdownTime; }
+      else if (data.type === 'message')   { addMessage(data.message, data.message.nick === nick); }
+      else if (data.type === 'deleted')   {
+        const el = document.querySelector(`[data-id="${data.id}"]`);
+        if (el) { const n=el.querySelector('.msg-nick'); const t=el.querySelector('.msg-time'); el.innerHTML = `${n?`<span class="msg-nick">${escapeHtml(n.textContent)}</span>`:''}<div class="msg-bubble deleted-text">Bu mesaj silindi</div>${t?`<span class="msg-time">${t.textContent}</span>`:''}`; el.classList.remove('show-delete'); }
+      }
+      else if (data.type === 'online')    { onlineNum.textContent=data.count; onlineList.textContent=data.users.join(', '); }
+      else if (data.type === 'system')    { addSystemMsg(data.text, data.kind); }
+      else if (data.type === 'typing')    { typingStatus.textContent=data.nick+' yazıyor...'; clearTimeout(typingTimeout); typingTimeout=setTimeout(()=>{typingStatus.textContent='';},2000); }
+    };
+    ws.onclose = () => {
+      setStatus('red');
+      if (chatScreen.style.display==='flex') setTimeout(() => connectChat(roomId, password), 2000);
+    };
+  }
 
-      const timeSpan = document.createElement('span'); timeSpan.className = 'msg-time';
-      const d = new Date(m.time); timeSpan.innerText = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-      
-      bubble.appendChild(timeSpan); row.appendChild(bubble); chatMessages.appendChild(row);
-      lastMsgNick = m.nick; lastMsgTime = mTime;
+  function enterChat() {
+    const n = nickInput.value.trim();
+    const p = roomPassInput.value;
+    if (!n) { lobbyError.textContent = 'Nick boş olamaz'; return; }
+    if (!p) { lobbyError.textContent = 'Şifre boş olamaz'; return; }
+    nick = n; localStorage.setItem(NICK_KEY, nick);
+    selectedRoomPass = p;
+    lobbyError.textContent = '';
+    connectChat(selectedRoomId, selectedRoomPass);
+  }
+
+  joinBtn.addEventListener('click', enterChat);
+  nickInput.addEventListener('keydown', e => { if (e.key==='Enter') roomPassInput.focus(); });
+  roomPassInput.addEventListener('keydown', e => { if (e.key==='Enter') enterChat(); });
+
+  // ── MESAJ ────────────────────────────────────────────────────────────────────
+  function sendMessage() {
+    const text = msgInput.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type:'chat', nick, text }));
+    msgInput.value=''; msgInput.focus(); emojiPanel.classList.remove('open');
+  }
+  msgInput.addEventListener('input', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type:'typing', nick }));
+  });
+  sendBtn.addEventListener('click', sendMessage);
+  msgInput.addEventListener('keydown', e => { if (e.key==='Enter') sendMessage(); });
+
+  // ── SES / DOSYA ──────────────────────────────────────────────────────────────
+  async function toggleRecording() {
+    if (isRecording) {
+      mediaRecorder.stop(); isRecording=false; micBtn.classList.remove('recording'); micBtn.textContent='🎤';
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(audioChunks, { type:'audio/webm' });
+          stream.getTracks().forEach(t=>t.stop());
+          uploadStatus.style.display='block';
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try { await fetch('/upload-audio', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ audio:reader.result, nick, roomId:selectedRoomId }) }); }
+            catch(e) { alert('Ses gönderilemedi!'); } finally { uploadStatus.style.display='none'; }
+          };
+          reader.readAsDataURL(blob);
+        };
+        mediaRecorder.start(); isRecording=true; micBtn.classList.add('recording'); micBtn.textContent='⏹';
+      } catch(e) { alert('Mikrofon izni gerekli!'); }
     }
+  }
+  micBtn.addEventListener('click', toggleRecording);
 
-    function scrollBottom() { setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 50); }
+  fileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0]; if (!file) return; fileInput.value='';
+    if (file.size > 20*1024*1024) { alert('Dosya 20MB\'dan büyük olamaz!'); return; }
+    uploadStatus.style.display='block';
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try { await fetch('/upload-file', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ file:reader.result, nick, fileType:file.type, fileName:file.name, roomId:selectedRoomId }) }); }
+      catch(e) { alert('Dosya gönderilemedi!'); } finally { uploadStatus.style.display='none'; }
+    };
+    reader.readAsDataURL(file);
+  });
 
-    function enterChat() {
-      const n = nickInput.value.trim(); if (!n) return;
-      nick = n; localStorage.setItem(NICK_KEY, nick);
-      connectChat();
-    }
-
-    function sendMessage() {
-      const text = msgInput.value.trim();
-      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ type: 'chat', nick, text }));
-      msgInput.value = ''; msgInput.focus();
-    }
-
-    msgInput.addEventListener('input', () => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ type: 'typing', nick }));
+  // ── EMOJİ ────────────────────────────────────────────────────────────────────
+  const EMOJIS = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','🥴','😇','🥳','🥺','🤠','🤡','🤥','🤫','🤭','🧐','🤓','😈','👿','👹','👺','💀','☠️','👻','👽','👾','🤖','💩','😺','😸','😹','😻','👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','🔥','💫','⭐','🌟','💥','❄️','🌈','🎉','🎊','🎈','🎁','🏆','🥇','⚽','🏀','🍕','🍔','🍣','☕','🍺','🚀','✈️','🌍','🌙','☀️','🌊','🎵','🎶','💎','🔑','💡','📱','💻','🎤','🎧','🎸','🎮','👑'];
+  EMOJIS.forEach(em => {
+    const span = document.createElement('span');
+    span.className='emoji-item'; span.textContent=em;
+    span.addEventListener('click', () => {
+      const s=msgInput.selectionStart, e2=msgInput.selectionEnd;
+      msgInput.value=msgInput.value.slice(0,s)+em+msgInput.value.slice(e2);
+      msgInput.selectionStart=msgInput.selectionEnd=s+em.length;
+      msgInput.focus();
     });
+    emojiGrid.appendChild(span);
+  });
+  emojiBtn.addEventListener('click', e => { e.stopPropagation(); emojiPanel.classList.toggle('open'); themePanel.classList.remove('open'); });
+  emojiClose.addEventListener('click', () => emojiPanel.classList.remove('open'));
 
-    joinBtn.addEventListener('click', enterChat);
-    nickInput.addEventListener('keydown', e => { if (e.key === 'Enter') enterChat(); });
-    sendBtn.addEventListener('click', sendMessage);
-    msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
-  </script>
+  // ── BİLDİRİM / SES ──────────────────────────────────────────────────────────
+  document.addEventListener('visibilitychange', () => {
+    pageVisible=!document.hidden;
+    if (pageVisible) { unreadCount=0; document.title='Laviva'; }
+  });
+  function notifyNewMessage(msg) {
+    if (pageVisible) return;
+    unreadCount++; document.title=`(${unreadCount}) Laviva`;
+    if (navigator.vibrate) navigator.vibrate(100);
+    if (Notification.permission==='granted') new Notification('Laviva', { body:msg.nick+': '+(msg.audioUrl?'🎤':msg.fileUrl?'📎':msg.text) });
+  }
+  function playNotifSound() {
+    try {
+      const ctx=new(window.AudioContext||window.webkitAudioContext)();
+      const osc=ctx.createOscillator(); const gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type='sine'; osc.frequency.setValueAtTime(660,ctx.currentTime); osc.frequency.setValueAtTime(880,ctx.currentTime+0.08);
+      gain.gain.setValueAtTime(0,ctx.currentTime); gain.gain.linearRampToValueAtTime(0.2,ctx.currentTime+0.01); gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.25);
+    } catch(e) {}
+  }
+  if ('Notification' in window && Notification.permission==='default') setTimeout(()=>Notification.requestPermission(),3000);
+
+  // ── AUDIO ────────────────────────────────────────────────────────────────────
+  function toggleAudio(btn,url,fillEl,durationEl) {
+    if (currentAudio && currentPlayBtn===btn) { currentAudio.pause(); currentAudio.currentTime=0; currentAudio=null; currentPlayBtn=null; btn.textContent='▶'; if(fillEl)fillEl.style.width='0%'; return; }
+    if (currentAudio) { currentAudio.pause(); currentAudio.currentTime=0; if(currentPlayBtn)currentPlayBtn.textContent='▶'; if(currentFill)currentFill.style.width='0%'; }
+    const audio=new Audio(url); currentAudio=audio; currentPlayBtn=btn; currentFill=fillEl; btn.textContent='⏹';
+    audio.play().catch(()=>{btn.textContent='▶';});
+    audio.ontimeupdate=()=>{ if(fillEl&&audio.duration)fillEl.style.width=(audio.currentTime/audio.duration*100)+'%'; if(durationEl&&audio.duration){const r=Math.ceil(audio.duration-audio.currentTime);durationEl.textContent='0:'+String(r).padStart(2,'0');} };
+    audio.onended=()=>{ btn.textContent='▶'; if(fillEl)fillEl.style.width='0%'; if(durationEl)durationEl.textContent=''; currentAudio=null; currentPlayBtn=null; currentFill=null; };
+  }
+
+  lightboxClose.addEventListener('click', ()=>lightbox.classList.remove('open'));
+  lightbox.addEventListener('click', e=>{ if(e.target===lightbox)lightbox.classList.remove('open'); });
+
+  // ── YARDIMCILAR ──────────────────────────────────────────────────────────────
+  function scrollBottom() { messagesEl.scrollTop=messagesEl.scrollHeight; }
+  function setStatus(s)   { statusDot.className=s; }
+  function formatTime(iso){ return new Date(iso).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); }
+  function escapeHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function addSystemMsg(text, kind) {
+    const div=document.createElement('div'); div.className='system-msg';
+    const nickPart=text.replace(' katıldı','').replace(' ayrıldı','');
+    const keyword=kind==='join'?' katıldı':' ayrıldı';
+    const color=kind==='join'?'#86efac':'#fca5a5';
+    div.innerHTML=`<span style="color:#6b7280">${escapeHtml(nickPart)}</span><span style="color:${color};font-weight:600">${keyword}</span>`;
+    messagesEl.appendChild(div); scrollBottom();
+  }
+
+  function getBubbleHtml(msg) {
+    if (msg.deleted) return `<div class="msg-bubble deleted-text">Bu mesaj silindi</div>`;
+    if (msg.audioUrl) return `<div class="audio-bubble"><button class="play-btn" data-url="${escapeHtml(msg.audioUrl)}">▶</button><div class="audio-info"><span class="audio-label">Sesli mesaj</span><span class="audio-duration"></span><div class="audio-progress-bar"><div class="audio-progress-fill"></div></div></div></div>`;
+    if (msg.fileUrl) {
+      if (msg.fileType?.startsWith('image/')) return `<img class="msg-img" src="${escapeHtml(msg.fileUrl)}" alt="foto" />`;
+      if (msg.fileType?.startsWith('video/')) return `<video class="msg-video" src="${escapeHtml(msg.fileUrl)}" controls></video>`;
+      return `<a class="file-bubble" href="${escapeHtml(msg.fileUrl)}" target="_blank" rel="noopener"><span class="file-icon">📄</span><span class="file-name">${escapeHtml(msg.fileName||'Dosya')}</span></a>`;
+    }
+    return `<div class="msg-bubble">${escapeHtml(msg.text)}</div>`;
+  }
+     function addMessage(msg, isMine) {
+    const div=document.createElement('div');
+    div.className='msg '+(isMine?'mine':'other');
+    div.dataset.id=msg.id; div.dataset.nick=msg.nick; div.dataset.time=formatTime(msg.time);
+    const allMsgs=messagesEl.querySelectorAll('.msg');
+    const prev=allMsgs[allMsgs.length-1];
+    const sameGroup=prev&&prev.dataset.nick===msg.nick&&prev.dataset.time===formatTime(msg.time)&&!msg.deleted;
+    if (sameGroup) { const pt=prev.querySelector('.msg-time'); if(pt)pt.remove(); }
+    div.innerHTML=`${sameGroup?'':` <span class="msg-nick">${escapeHtml(msg.nick)}</span>`}${getBubbleHtml(msg)}<span class="msg-time">${formatTime(msg.time)}</span>${isMine&&!msg.deleted?`<button class="delete-btn">✕</button>`:''}`;
+    const playBtn=div.querySelector('.play-btn');
+    if (playBtn) {
+      const fillEl=div.querySelector('.audio-progress-fill');
+      const durEl=div.querySelector('.audio-duration');
+      playBtn.addEventListener('click', e=>{ e.stopPropagation(); toggleAudio(playBtn,playBtn.dataset.url,fillEl,durEl); });
+    }
+    const imgEl=div.querySelector('.msg-img');
+    if (imgEl) imgEl.addEventListener('click',()=>{ lightboxImg.src=imgEl.src; lightbox.classList.add('open'); });
+    if (isMine&&!msg.deleted) {
+      div.addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-btn')) { ws.send(JSON.stringify({type:'delete',id:msg.id,nick})); return; }
+        if (['play-btn','msg-img','msg-video'].some(c=>e.target.classList.contains(c))) return;
+        document.querySelectorAll('.msg.mine').forEach(m=>m.classList.remove('show-delete'));
+        div.classList.toggle('show-delete');
+      });
+    }
+    messagesEl.appendChild(div); scrollBottom();
+    if (!isMine) { playNotifSound(); notifyNewMessage(msg); if(navigator.vibrate)navigator.vibrate(80); }
+  }
+
+  if (window.visualViewport) window.visualViewport.addEventListener('resize',()=>setTimeout(scrollBottom,100));
+
+  // ── ADMİN PANELİ ─────────────────────────────────────────────────────────────
+  // URL'de ?admin varsa admin ekranı aç
+  if (location.search.includes('admin')) {
+    showScreen('admin');
+    if (adminToken) { adminLogin.style.display='none'; adminPanel.classList.add('active'); loadAdminRooms(); }
+  }
+
+  document.getElementById('admin-login-btn').addEventListener('click', async () => {
+    const u=document.getElementById('admin-user-input').value.trim();
+    const p=document.getElementById('admin-pass-input').value;
+    const err=document.getElementById('admin-login-error');
+    try {
+      const res=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+      const data=await res.json();
+      if (data.ok) {
+        adminToken=data.token; sessionStorage.setItem('laviva_admin_token',adminToken);
+        adminLogin.style.display='none'; adminPanel.classList.add('active'); loadAdminRooms();
+      } else { err.textContent=data.error||'Hata'; }
+    } catch(e) { err.textContent='Bağlantı hatası'; }
+  });
+
+  document.getElementById('admin-logout-btn').addEventListener('click', async () => {
+    try { await fetch('/admin/logout',{method:'POST',headers:{'x-admin-token':adminToken}}); } catch(e){}
+    adminToken=null; sessionStorage.removeItem('laviva_admin_token');
+    adminPanel.classList.remove('active'); adminLogin.style.display='flex';
+    document.getElementById('admin-user-input').value='';
+    document.getElementById('admin-pass-input').value='';
+  });
+
+  async function loadAdminRooms() {
+    const list=document.getElementById('admin-rooms-list');
+    const msg=document.getElementById('admin-msg');
+    list.innerHTML='<div style="color:#4b5563;font-size:0.85rem;text-align:center;padding:8px">Yükleniyor...</div>';
+    try {
+      const res=await fetch('/admin/rooms',{headers:{'x-admin-token':adminToken}});
+      if (res.status===401) { adminPanel.classList.remove('active'); adminLogin.style.display='flex'; return; }
+      const rooms=await res.json();
+      list.innerHTML='';
+      rooms.forEach(r => {
+        const card=document.createElement('div');
+        card.className='admin-room-card';
+        card.innerHTML=`
+          <div class="admin-room-header">
+            <span class="admin-room-id">ID: ${escapeHtml(r.id)}</span>
+            <span class="admin-room-online">● ${r.online} çevrimiçi</span>
+          </div>
+          <div class="admin-room-fields">
+            <input class="r-name" placeholder="Oda adı" value="${escapeHtml(r.name)}" />
+            <input class="r-pass" type="password" placeholder="Yeni şifre" value="${escapeHtml(r.password)}" />
+          </div>
+          <div class="admin-room-actions">
+            <button class="btn-save">💾 Kaydet</button>
+            <button class="btn-clear">🗑 Mesajları Sil</button>
+            <button class="btn-delete">✕ Odayı Sil</button>
+          </div>`;
+        card.querySelector('.btn-save').addEventListener('click', async () => {
+          const name=card.querySelector('.r-name').value.trim();
+          const pass=card.querySelector('.r-pass').value;
+          if (!name) { msg.textContent='Oda adı boş olamaz'; msg.style.color='#f87171'; return; }
+          const res2=await fetch(`/admin/rooms/${r.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-admin-token':adminToken},body:JSON.stringify({name,password:pass||undefined})});
+          const d=await res2.json();
+          msg.textContent=d.ok?'✓ Kaydedildi':'Hata: '+d.error;
+          msg.style.color=d.ok?'#86efac':'#f87171';
+          setTimeout(()=>{msg.textContent='';},3000);
+        });
+        card.querySelector('.btn-clear').addEventListener('click', async () => {
+          if (!confirm(`"${r.name}" odasının TÜM mesajları silinsin mi?`)) return;
+          const res2=await fetch(`/admin/rooms/${r.id}/messages`,{method:'DELETE',headers:{'x-admin-token':adminToken}});
+          const d=await res2.json();
+          msg.textContent=d.ok?'✓ Mesajlar silindi':'Hata';
+          msg.style.color=d.ok?'#86efac':'#f87171';
+          setTimeout(()=>{msg.textContent='';},3000);
+        });
+        card.querySelector('.btn-delete').addEventListener('click', async () => {
+          if (!confirm(`"${r.name}" odası SİLİNSİN mi? Bu işlem geri alınamaz.`)) return;
+          const res2=await fetch(`/admin/rooms/${r.id}`,{method:'DELETE',headers:{'x-admin-token':adminToken}});
+          const d=await res2.json();
+          if (d.ok) { loadAdminRooms(); msg.textContent='✓ Oda silindi'; msg.style.color='#86efac'; setTimeout(()=>{msg.textContent='';},3000); }
+        });
+        list.appendChild(card);
+      });
+    } catch(e) { list.innerHTML='<div style="color:#f87171;font-size:0.85rem;text-align:center;padding:8px">Hata oluştu</div>'; }
+  }
+
+  document.getElementById('add-room-btn').addEventListener('click', async () => {
+    const name=document.getElementById('new-room-name').value.trim();
+    const pass=document.getElementById('new-room-pass').value;
+    const msg=document.getElementById('admin-msg');
+    if (!name||!pass) { msg.textContent='Ad ve şifre gerekli'; msg.style.color='#f87171'; return; }
+    const res=await fetch('/admin/rooms',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':adminToken},body:JSON.stringify({name,password:pass})});
+    const d=await res.json();
+    if (d.ok) {
+      document.getElementById('new-room-name').value='';
+      document.getElementById('new-room-pass').value='';
+      loadAdminRooms();
+      msg.textContent='✓ Oda eklendi'; msg.style.color='#86efac';
+    } else { msg.textContent='Hata: '+d.error; msg.style.color='#f87171'; }
+    setTimeout(()=>{msg.textContent='';},3000);
+  });
+
+  // ── KANVASs ARKA PLAN ─────────────────────────────────────────────────────────
+  (function() {
+    const canvas=document.getElementById('bg-canvas');
+    const ctx=canvas.getContext('2d');
+    let W,H,particles=[];
+    function resize(){ W=canvas.width=innerWidth; H=canvas.height=innerHeight; }
+    resize(); window.addEventListener('resize',resize);
+    for (let i=0;i<40;i++) particles.push({ x:Math.random()*1000,y:Math.random()*1000,r:Math.random()*1.5+0.5,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,o:Math.random()*0.5+0.1 });
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      particles.forEach(p=>{
+        ctx.beginPath(); ctx.arc(p.x%W,p.y%H,p.r,0,Math.PI*2);
+        ctx.fillStyle=`rgba(167,139,250,${p.o})`; ctx.fill();
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.x<0)p.x+=W; if(p.x>W)p.x-=W;
+        if(p.y<0)p.y+=H; if(p.y>H)p.y-=H;
+      });
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
+    // ── BAŞLANGIÇ ────────────────────────────────────────────────────────────────
+  if (Date.now() >= SHUTDOWN_TIME) {
+    isClosed=true; showScreen('closed');
+  } else if (location.search.includes('admin')) {
+    // admin ekranı zaten açık
+  } else {
+    showScreen('room-select');
+    loadRooms();
+  }
+</script>
 </body>
 </html>
